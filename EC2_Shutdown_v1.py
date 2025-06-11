@@ -1,32 +1,46 @@
 import boto3
 import json
 
-ec2 = boto3.resource('ec2', region_name='us-east-1')
-
-def lambda_handler(event, context):
-    filteredInstances = []
-
-    ec2Filters = [
-        {
-            'Name': 'tag:Environment',
-            'Values': ['DEV']
-        },
-        {
-            'Name': 'instance-state-name',
-            'Values': ['running']
-        }]
+def EC2_Shutdown_DEV_ONLY(region_name='us-east-1'):
+    EC2_Shutdown_DEV_ONLY = boto3.client('ec2', region_name=region_name)
     
+    response = EC2_Shutdown_DEV_ONLY.describe_instances(
+        Filters=[
+            {'Name': 'instance-state-name', 'Values': ['running']}
 
-    instances = ec2.instances.filter(Filters=ec2Filters)
+        ]
+    )
+    running_instances = []
+    dev_instance_ids = []
 
-    for instance in instances:
-        filteredInstances.append(instance.id)
+    for reservation in response['Reservations']:
+        for instance in reservation['Instances']:
+            instance_id = instance['InstanceId']
+            tags = {tag['Key']: tag['Value'] for tag in instance.get('Tags', [])}
+            is_dev = tags.get('Environment', '').lower() == 'dev'
 
-        print(filteredInstances)
+            instance_info = {
+                'InstanceId': instance_id,
+                'InstanceType': instance['InstanceType'],
+                'State': instance['State']['Name'],
+                'Tags': tags
+            }
+            running_instances.append(instance_info)
 
-    positiveMessage = f"Congratulations! The following {len(filteredInstances)} instances have been stopped."
-    negativeMessage = "There are no instances matching with the selected filters. Please adjust filters and try again."
+            if is_dev:
+                dev_instance_ids.append(instance_id)
+
+print("======These are the current Running Instances=======")
+for inst in running_instances:
+    print(f"{inst['InstanceId']} ({inst['InstanceType']}) - State: {inst['State']}")
+    print(f" Tags: {inst['Tags']}\n")
+
+if dev_instance_ids:
+    print(f"Stopping Development instances: {dev_instance_ids}")
+    EC2_Shutdown_DEV_ONLY.stop_instances(InstanceIds=dev_instance_ids)
+else:
+    print("Sorry, but there are no Development-tagged instances to stop.")
     
-
-
-
+if __name__ == '__main__':
+    EC2_Shutdown_DEV_ONLY()
+    
