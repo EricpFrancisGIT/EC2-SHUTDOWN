@@ -2,9 +2,9 @@ import boto3
 import json
 
 def EC2_Shutdown_DEV_ONLY(region_name='us-east-1'):
-    EC2_Shutdown_DEV_ONLY = boto3.client('ec2', region_name=region_name)
-    
-    response = EC2_Shutdown_DEV_ONLY.describe_instances(
+    ec2_client = boto3.client('ec2', region_name=region_name)
+
+    response = ec2_client.describe_instances(
         Filters=[
             {'Name': 'instance-state-name', 'Values': ['running']}
 
