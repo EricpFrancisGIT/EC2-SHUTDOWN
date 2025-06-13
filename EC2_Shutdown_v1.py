@@ -1,15 +1,16 @@
 import boto3
 import json
 
-def EC2_Shutdown_DEV_ONLY(region_name='us-east-1'):
+def lambda_handler(event, context):
+    region_name = 'us-east-1'
     ec2_client = boto3.client('ec2', region_name=region_name)
 
     response = ec2_client.describe_instances(
         Filters=[
             {'Name': 'instance-state-name', 'Values': ['running']}
-
         ]
     )
+
     running_instances = []
     dev_instance_ids = []
 
@@ -30,17 +31,22 @@ def EC2_Shutdown_DEV_ONLY(region_name='us-east-1'):
             if is_dev:
                 dev_instance_ids.append(instance_id)
 
-print("======These are the current Running Instances=======")
-for inst in running_instances:
-    print(f"{inst['InstanceId']} ({inst['InstanceType']}) - State: {inst['State']}")
-    print(f" Tags: {inst['Tags']}\n")
+    print("======These are the current Running Instances=======")
+    for inst in running_instances:
+        print(f"{inst['InstanceId']} ({inst['InstanceType']}) - State: {inst['State']}")
+        print(f" Tags: {inst['Tags']}\n")
 
-if dev_instance_ids:
-    print(f"Stopping Development instances: {dev_instance_ids}")
-    EC2_Shutdown_DEV_ONLY.stop_instances(InstanceIds=dev_instance_ids)
-else:
-    print("Sorry, but there are no Development-tagged instances to stop.")
-    
-if __name__ == '__main__':
-    EC2_Shutdown_DEV_ONLY()
+    if dev_instance_ids:
+        print(f"Stopping Development instances: {dev_instance_ids}")
+        ec2_client.stop_instances(InstanceIds=dev_instance_ids)
+    else:
+        print("No Development-tagged instances to stop.")
+
+    return {
+        'statusCode': 200,
+        'body': json.dumps({
+            'StoppedInstances': dev_instance_ids,
+            'TotalRunningInstances': len(running_instances)
+        })
+    }
     
